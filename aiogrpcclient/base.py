@@ -15,6 +15,8 @@ class BaseGrpcClient(AioThing):
         base_url,
     ):
         super().__init__()
+        if base_url is None:
+            raise RuntimeError(f'`base_url` must be passed for {self.__class__.__name__} constructor')
         self.channel = insecure_channel(base_url, [
             ('grpc.dns_min_time_between_resolutions_ms', 1000),
             ('grpc.initial_reconnect_backoff_ms', 1000),
