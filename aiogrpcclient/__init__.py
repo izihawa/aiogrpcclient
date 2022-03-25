@@ -1,3 +1,6 @@
-from .base import BaseGrpcClient
+from .base import (
+    BaseGrpcClient,
+    expose,
+)
 
-__all__ = ['BaseGrpcClient']
+__all__ = ['BaseGrpcClient', 'expose']

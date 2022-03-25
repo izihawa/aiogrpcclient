@@ -1,8 +1,14 @@
+import asyncio
 import json
 
 from aiokit import AioThing
 from grpc import StatusCode
 from grpc.experimental.aio import insecure_channel
+
+
+def expose(method):
+    method._exposable = True
+    return method
 
 
 class BaseGrpcClient(AioThing):
@@ -14,13 +20,14 @@ class BaseGrpcClient(AioThing):
 
     def __init__(
         self,
-        base_url,
-        max_retries: int = 5,
+        endpoint,
+        max_retries: int = 2,
         retry_delay: float = 0.5,
+        connection_timeout: float = None,
     ):
         super().__init__()
-        if base_url is None:
-            raise RuntimeError(f'`base_url` must be passed for {self.__class__.__name__} constructor')
+        if endpoint is None:
+            raise RuntimeError(f'`endpoint` must be passed for {self.__class__.__name__} constructor')
         config = [
             ('grpc.dns_min_time_between_resolutions_ms', 1000),
             ('grpc.initial_reconnect_backoff_ms', 1000),
@@ -38,13 +45,20 @@ class BaseGrpcClient(AioThing):
                 }
             }]}))
         ]
-        self.channel = insecure_channel(base_url, config)
+        self.connection_timeout = connection_timeout
+        self.channel = insecure_channel(endpoint, config)
         self.stubs = {}
         for stub_name, stub_cls in self.stub_clses.items():
             self.stubs[stub_name] = stub_cls(self.channel)
 
     async def start(self):
-        await self.channel.channel_ready()
+        await asyncio.wait_for(self.channel.channel_ready(), timeout=self.connection_timeout)
 
     async def stop(self):
         await self.channel.close()
+
+    def get_interface(self):
+        return {
+            method_name.replace('_', '-'): getattr(self, method_name) for method_name in dir(self)
+            if callable(getattr(self, method_name)) and getattr(getattr(self, method_name), '_exposable', False)
+        }
